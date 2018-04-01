@@ -119,13 +119,12 @@ def proprocess(path):
                                            'Y': numpy.float64, 'DIRECTION': numpy.float64,
                                            'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
                                            'CALLSTATE': numpy.int32})
+        print("读测试集")
 
     df = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
                                    'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
-    print("读测试集")
 
     curr_id = 1
-
     try:
         while True:
             df2 = csv_chunk.get_chunk(10000000)
@@ -201,6 +200,8 @@ def proprocess(path):
     userIdList.append(userId)
     l = []
     lRes = []  # 最后按user_id分的列表
+    yRes = [] # 最后按user_id分的列表
+    # userIdListRes =
 
     for index, row in user_trips.iterrows():
         if row['user_id'] == userId:
@@ -214,17 +215,30 @@ def proprocess(path):
             lRes.append(l)
             userIdList.append(int(row['user_id']))
             y.append(row[2])
-
             l = []
             l.append(row[3:])
             userId = row['user_id']
     # 进行聚类处理
-    clusterCenters = []
-    for i in range(len(lRes)):
-        if len(lRes[i]) > 0:
-            clusterCenters.append(KMeans(n_clusters=1, random_state=0).fit(lRes[i]).cluster_centers_)
+    if path == path_train:
+        clusterCenters = []
+        for i in range(len(lRes)):
+            if len(lRes[i]) >= 3:
+                clusterCenters.append(KMeans(n_clusters=3, random_state=0).fit(lRes[i]).cluster_centers_)
+                yRes.append(y[i])
+    else:
+        clusterCenters = []
+        for i in range(len(lRes)):
+            if len(lRes[i]) > 3:
+                clusterCenters.append(KMeans(n_clusters=3, random_state=0).fit(lRes[i]).cluster_centers_)
+            elif len(lRes[i])==1:
+                clusterCenters.append([lRes[i][0],lRes[i][0],lRes[i][0]])
+            elif len(lRes[i])==2:
+                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][1]])
+            elif len(lRes[i])==3:
+                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][2]])
+            yRes.append(y[i])
 
-    return clusterCenters, y, userIdList
+    return clusterCenters, yRes, userIdList
 
 
 def add_layer(inputs, in_size, out_size, activation_function=None):  # 先不定义激励函数
@@ -298,13 +312,32 @@ if __name__ == "__main__":
     path_train = "data/dm/train.csv"  # 训练文件
     path_test = "data/dm/test.csv"  # 测试文件
     path_test_out = "model/"  # 预测结果输出路径为model/xx.csv,有且只能有一个文件并且是CSV格式。
+    # PCA提取特征数
+    PCA_featureNum = 10
 
     print("****************** start **********************")
-    # readRows = 20000
     train_clusterCenters, train_y, train_userIdList = proprocess(path_train)
     test_clusterCenters, test_y, test_userIdList = proprocess(path_test)
-    #PCA提取特征数
-    PCA_featureNum = 5
+    #簇中心合成一个样例
+    train_X = []
+    test_X = []
+    for i in train_clusterCenters:
+        train_X.append(numpy.reshape(i, (1, -1)))
+    for j in test_clusterCenters:
+        test_X.append(numpy.reshape(j, (1, -1)))
+
+    train_X = numpy.reshape(train_X, (-1, 30))
+    test_X = numpy.reshape(test_X, (-1, 30))
+    train_y = numpy.reshape(train_y, (-1, 1))
+    #归一化
+    min_max_scaler = preprocessing.MinMaxScaler()
+    train_X = min_max_scaler.fit_transform(train_X)
+    test_X = min_max_scaler.transform(test_X)
+    #PCA
+    pca = PCA(n_components=PCA_featureNum)  # 保留×个主成分
+    train_X = pca.fit_transform(train_X)  # 把原始训练集映射到主成分组成的子空间中
+    test_X = pca.transform(test_X)  # 把原始测试集映射到主成分组成的子空间中
+    #训练
     # 定义传入
     xs = tf.placeholder(tf.float32, [None, PCA_featureNum])
     ys = tf.placeholder(tf.float32, [None, 1])
@@ -312,26 +345,14 @@ if __name__ == "__main__":
     l1 = add_layer(xs, PCA_featureNum, PCA_featureNum+2, activation_function=tf.nn.relu)
     predition = add_layer(l1, PCA_featureNum+2, 1, activation_function=None)
     loss = tf.reduce_mean(tf.reduce_sum(tf.square(ys - predition)))
-    train_step = tf.train.GradientDescentOptimizer(0.001).minimize(loss)
+    train_step = tf.train.GradientDescentOptimizer(0.002).minimize(loss)
 
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
-
-    train_clusterCenters = numpy.reshape(train_clusterCenters, (-1, 10))
-    test_clusterCenters = numpy.reshape(test_clusterCenters, (-1, 10))
-    train_y = numpy.reshape(train_y, (-1, 1))
-    #归一化
-    min_max_scaler = preprocessing.MinMaxScaler()
-    train_clusterCenters = min_max_scaler.fit_transform(train_clusterCenters)
-    test_clusterCenters = min_max_scaler.transform(test_clusterCenters)
-    #PCA
-    pca = PCA(n_components=PCA_featureNum)  # 保留×个主成分
-    train_clusterCenters = pca.fit_transform(train_clusterCenters)  # 把原始训练集映射到主成分组成的子空间中
-    test_clusterCenters = pca.transform(test_clusterCenters)  # 把原始测试集映射到主成分组成的子空间中
-    for i in range(10000):
-        sess.run(train_step, feed_dict={xs: train_clusterCenters, ys: train_y})
-        prediction_value = sess.run(predition, feed_dict={xs: test_clusterCenters})
+    for i in range(5000):
+        sess.run(train_step, feed_dict={xs: train_X, ys: train_y})
+        prediction_value = sess.run(predition, feed_dict={xs: test_X})
 #        print(prediction_value)
 
     # 将test_userIdList 和 prediction_value写入
