@@ -109,7 +109,7 @@ def proprocess(path):
                                            'Y': numpy.float64, 'DIRECTION': numpy.float64,
                                            'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
                                            'CALLSTATE': numpy.int32})
-        print("读训练集")
+        print('read train set')
         #,nrows=5000000
     else:
         csv_chunk = pandas.read_csv(path, iterator=True,
@@ -119,7 +119,7 @@ def proprocess(path):
                                            'Y': numpy.float64, 'DIRECTION': numpy.float64,
                                            'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
                                            'CALLSTATE': numpy.int32})
-        print("读测试集")
+        print('read test set')
 
     df = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
                                    'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
@@ -345,12 +345,15 @@ if __name__ == "__main__":
     l1 = add_layer(xs, PCA_featureNum, PCA_featureNum+2, activation_function=tf.nn.relu)
     predition = add_layer(l1, PCA_featureNum+2, 1, activation_function=None)
     loss = tf.reduce_mean(tf.reduce_sum(tf.square(ys - predition)))
-    train_step = tf.train.GradientDescentOptimizer(0.002).minimize(loss)
+    # train_step = tf.train.GradientDescentOptimizer(0.002).minimize(loss)
+
+    train_step =tf.train.AdamOptimizer(learning_rate=0.1, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
+                                    name='Adam').minimize(loss)
 
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
-    for i in range(5000):
+    for i in range(50):
         sess.run(train_step, feed_dict={xs: train_X, ys: train_y})
         prediction_value = sess.run(predition, feed_dict={xs: test_X})
 #        print(prediction_value)
