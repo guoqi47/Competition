@@ -41,86 +41,95 @@ def haversine(zuo):
     return c * r * 1000
 
 
-if __name__ == "__main__":
-    print("****************** start **********************")
-    # 程序入口
-    csv_chunk = pandas.read_csv('/data/dm/train.csv', iterator=True, dtype={'TERMINALNO': numpy.int32, 'TIME': numpy.int32,
-                                                                            'TRIP_ID': numpy.int32, 'LONGITUDE': numpy.float64,
-                                                                            'LATITUDE': numpy.float64,
-                                                                            'Y': numpy.float64, 'DIRECTION': numpy.float64,
-                                                                            'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
-                                                                            'CALLSTATE': numpy.int32})
+def compress(file_path):
+    csv_chunk = pandas.read_csv(file_path, iterator=True,
+                                dtype={'TERMINALNO': numpy.int32, 'TIME': numpy.int32,
+                                       'TRIP_ID': numpy.int32, 'LONGITUDE': numpy.float64,
+                                       'LATITUDE': numpy.float64,
+                                       'Y': numpy.float64, 'DIRECTION': numpy.float64,
+                                       'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
+                                       'CALLSTATE': numpy.int32})
+
 
     n = 0
     df = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
                                    'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
 
     curr_id = 1
+    new_row = []
+    tmp_user = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
+                                   'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
 
     try:
         while True:
-            df2 = csv_chunk.get_chunk(10000000)
+            df2 = csv_chunk.get_chunk(10000)
+            flag = True
+            df = pandas.concat([tmp_user, df2])
+            while flag:
+                trip_id = 1
+                line_num = 0
+                user = df.ix[df['TERMINALNO'] == curr_id]
+                if not user.empty:
+                    user = user.sort_values(by='TIME')
+                    user = user.reset_index(drop=True)
+                    user['pre'] = user['TIME'].shift(1)
+                    user['cha'] = user['TIME'] - user['pre']
+                    gap = user.ix[user['cha'] >= 1800]
+                    for index, row in gap.iterrows():
+                        trip = user.ix[line_num:index - 1]
+                        le = len(trip) - 1
+                        line_num = index
+                        new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
+                                        [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
+                                        (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
+                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                        trip_id += 1
+                    trip = user.ix[line_num:]
+                    le = len(trip) - 1
+                    new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
+                                    [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
+                                    (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                    curr_id += 1
 
-            df = pandas.concat([df, df2])
+                else:
+                    curr_id -= 1
+                    tmp_user = df.ix[df['TERMINALNO'] == curr_id]
+                    flag = False
+
     except StopIteration:
+        print('Stop read')
         pass
-
-    flag = True
-    new_row = []
-    while flag:
-        trip_id = 0
-        line_num = 0
-        user = df.ix[df['TERMINALNO'] == curr_id]
-        if not user.empty:
-            user = user.sort_values(by='TIME')
-            user = user.reset_index(drop=True)
-            user['pre'] = user['TIME'].shift(1)
-            user['cha'] = user['TIME'] - user['pre']
-            gap = user.ix[user['cha'] >= 1800]
-
-            for index, row in gap.iterrows():
-                trip = user.ix[line_num:index-1]
-                le = len(trip) - 1
-                line_num = index
-                new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
-                                [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                                (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
-                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-                trip_id += 1
-            trip = user.ix[line_num:]
-            le = len(trip) - 1
-            new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
-                            [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                            (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-            curr_id += 1
-        else:
-            break
 
     user_trips = pandas.DataFrame(new_row, columns=['user_id', 'trip_id', 'speeds', 'dir', 'hig', 'coor',
                                                     'time', 'Y', 'call', "dis", 't1', 't2', 't3', 't4', 'time_list',
                                                     'var_dir', 'ave_v', 'var_v', 'ave_h'])
     user_trips['var_dir'] = user_trips['dir'].map(lambda x: x.var()).map(lambda x: x if pandas.notnull(x) else 0)
-    user_trips['var_v'] = user_trips['speeds'].map(lambda x: x.var()).map(lambda x: x if pandas.notnull(x) else 0)
-    user_trips['ave_h'] = user_trips['hig'].map(lambda x: x.mean())
-    user_trips['dis'] = user_trips['coor'].map(haversine)
-    user_trips['ave_v'] = (user_trips['dis'] / user_trips['time'].map(lambda x: x[1] - x[0])).map(lambda x: x if pandas.notnull(x) else 0)
-
-    user_trips.pop('speeds')
     user_trips.pop('dir')
+    user_trips['var_v'] = user_trips['speeds'].map(lambda x: x.var())
+    user_trips.pop('speeds')
+    user_trips['ave_h'] = user_trips['hig'].map(lambda x: x.mean())
     user_trips.pop('hig')
+    user_trips['dis'] = user_trips['coor'].map(haversine)
     user_trips.pop('coor')
+    user_trips['ave_v'] = (user_trips['dis'] / user_trips['time'].map(lambda x: x[1] - x[0]))
     user_trips['time_list'] = user_trips['time'].map(time_list)
+    user_trips.pop('time')
     user_trips['t1'] = user_trips['time_list'].map(lambda x: x[0])
     user_trips['t2'] = user_trips['time_list'].map(lambda x: x[1])
     user_trips['t3'] = user_trips['time_list'].map(lambda x: x[2])
     user_trips['t4'] = user_trips['time_list'].map(lambda x: x[3])
     user_trips.pop('time_list')
-    user_trips.pop('time')
-    user_trips.to_csv('compress.csv')
+    user_trips.fillna(0, inplace=True)
     del df
-    del user_trips
     gc.collect()
     print(time.time() - t1)
+    return user_trips, curr_id
 
+
+if __name__ == "__main__":
+    print("****************** start **********************")
+    # 程序入口
+    train = compress('data/dm/555.csv')[0]
+    train.to_csv('co.csv')
 

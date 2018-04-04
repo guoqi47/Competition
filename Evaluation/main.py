@@ -108,8 +108,8 @@ def proprocess(path):
                                            'LATITUDE': numpy.float64,
                                            'Y': numpy.float64, 'DIRECTION': numpy.float64,
                                            'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
-                                           'CALLSTATE': numpy.int32})
-        print('read train set')
+                                           'CALLSTATE': numpy.int32},nrows=3000000)
+        
         #,nrows=5000000
     else:
         csv_chunk = pandas.read_csv(path, iterator=True,
@@ -119,7 +119,7 @@ def proprocess(path):
                                            'Y': numpy.float64, 'DIRECTION': numpy.float64,
                                            'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
                                            'CALLSTATE': numpy.int32})
-        print('read test set')
+        
 
     df = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
                                    'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
@@ -317,7 +317,10 @@ if __name__ == "__main__":
 
     print("****************** start **********************")
     train_clusterCenters, train_y, train_userIdList = proprocess(path_train)
+    print('***read train set',time.clock()-start)
     test_clusterCenters, test_y, test_userIdList = proprocess(path_test)
+    print('***read test set',time.clock()-start)
+    print('***Neural network Begin:',time.clock()-start)
     #簇中心合成一个样例
     train_X = []
     test_X = []
@@ -347,7 +350,7 @@ if __name__ == "__main__":
     loss = tf.reduce_mean(tf.reduce_sum(tf.square(ys - predition)))
     # train_step = tf.train.GradientDescentOptimizer(0.002).minimize(loss)
 
-    train_step =tf.train.AdamOptimizer(learning_rate=0.1, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
+    train_step =tf.train.AdamOptimizer(learning_rate=0.2, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
                                     name='Adam').minimize(loss)
 
     init = tf.global_variables_initializer()
