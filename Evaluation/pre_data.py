@@ -50,15 +50,15 @@ def compress(file_path):
                                        'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
                                        'CALLSTATE': numpy.int32})
 
-
-    n = 0
     df = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
                                    'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
 
     curr_id = 1
     new_row = []
+    id_list = []
+    y_list = []
     tmp_user = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
-                                   'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
+                                         'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
 
     try:
         while True:
@@ -70,6 +70,8 @@ def compress(file_path):
                 line_num = 0
                 user = df.ix[df['TERMINALNO'] == curr_id]
                 if not user.empty:
+                    id_list.append(curr_id)
+                    y_list.append(user.iat[0, 9])
                     user = user.sort_values(by='TIME')
                     user = user.reset_index(drop=True)
                     user['pre'] = user['TIME'].shift(1)
@@ -81,30 +83,27 @@ def compress(file_path):
                         line_num = index
                         new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
                                         [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                                        (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
+                                        (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0],
                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
                         trip_id += 1
                     trip = user.ix[line_num:]
                     le = len(trip) - 1
                     new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
                                     [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                                    (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
+                                    (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0],
                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
                     curr_id += 1
-
                 else:
                     curr_id -= 1
                     tmp_user = df.ix[df['TERMINALNO'] == curr_id]
                     flag = False
-
     except StopIteration:
         print('Stop read')
-        pass
 
     user_trips = pandas.DataFrame(new_row, columns=['user_id', 'trip_id', 'speeds', 'dir', 'hig', 'coor',
-                                                    'time', 'Y', 'call', "dis", 't1', 't2', 't3', 't4', 'time_list',
+                                                    'time', 'call', "dis", 't1', 't2', 't3', 't4', 'time_list',
                                                     'var_dir', 'ave_v', 'var_v', 'ave_h'])
-    user_trips['var_dir'] = user_trips['dir'].map(lambda x: x.var()).map(lambda x: x if pandas.notnull(x) else 0)
+    user_trips['var_dir'] = user_trips['dir'].map(lambda x: x.var())
     user_trips.pop('dir')
     user_trips['var_v'] = user_trips['speeds'].map(lambda x: x.var())
     user_trips.pop('speeds')
@@ -121,15 +120,16 @@ def compress(file_path):
     user_trips['t4'] = user_trips['time_list'].map(lambda x: x[3])
     user_trips.pop('time_list')
     user_trips.fillna(0, inplace=True)
+
+    Y_data = pandas.DataFrame(y_list, index=id_list)
+    Y_data.index.rename('id', inplace=True)
     del df
     gc.collect()
     print(time.time() - t1)
-    return user_trips, curr_id
+    return user_trips, Y_data
 
 
 if __name__ == "__main__":
     print("****************** start **********************")
-    # 程序入口
-    train = compress('data/dm/555.csv')[0]
-    train.to_csv('co.csv')
+    train = compress('555.csv')
 
