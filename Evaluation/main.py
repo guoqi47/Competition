@@ -443,13 +443,14 @@ def writeCsv(test_userIdList, prediction_value):
             writer.writerow([test_userIdList[i], pred])  # 随机值
             #
             ret_set.add(test_userIdList[i])  # 根据赛题要求，ID必须唯一。输出预测值时请注意去重
+        writer.writerow([test_userIdList[-1], 0])  # 随机值
 
 
 
 if __name__ == "__main__":
     start = time.clock()
-    path_train = "data/dm/train.csv"  # 训练文件
-    path_test = "data/dm/test.csv"  # 测试文件
+    path_train = "/data/dm/train.csv"  # 训练文件
+    path_test = "/data/dm/test.csv"  # 测试文件
     path_test_out = "model/"  # 预测结果输出路径为model/xx.csv,有且只能有一个文件并且是CSV格式。
     # PCA提取特征数
     PCA_featureNum = 10
@@ -491,13 +492,13 @@ if __name__ == "__main__":
     loss = tf.reduce_mean(tf.reduce_sum(tf.square(ys - predition)))
     # train_step = tf.train.GradientDescentOptimizer(0.002).minimize(loss)
 
-    train_step =tf.train.AdamOptimizer(learning_rate=0.1, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
+    train_step =tf.train.AdamOptimizer(learning_rate=0.05, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
                                     name='Adam').minimize(loss)
 
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
-    for i in range(500):
+    for i in range(1000):
         sess.run(train_step, feed_dict={xs: train_X, ys: train_y})
         prediction_value = sess.run(predition, feed_dict={xs: test_X})
 #        print(prediction_value)
