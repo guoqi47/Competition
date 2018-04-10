@@ -59,187 +59,7 @@ def haversine(zuo):
 #                         "CALLSTATE", "Y"]
 #     return tempdata
 
-def compress(file_path):
-    csv_chunk = pandas.read_csv(file_path, iterator=True,
-                                dtype={'TERMINALNO': numpy.int32, 'TIME': numpy.int32,
-                                       'TRIP_ID': numpy.int32, 'LONGITUDE': numpy.float64,
-                                       'LATITUDE': numpy.float64,
-                                       'Y': numpy.float64, 'DIRECTION': numpy.float64,
-                                       'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
-                                       'CALLSTATE': numpy.int32})
-
-    df = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
-                                   'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
-
-    curr_id = 1
-    new_row = []
-    id_list = []
-    y_list = []
-    tmp_user = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
-                                         'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
-
-    try:
-        while True:
-            df2 = csv_chunk.get_chunk(10000)
-            flag = True
-            df = pandas.concat([tmp_user, df2])
-            while flag:
-                trip_id = 1
-                line_num = 0
-                user = df.ix[df['TERMINALNO'] == curr_id]
-                if not user.empty:
-                    id_list.append(curr_id)
-                    y_list.append(user.iat[0, 9])
-                    user = user.sort_values(by='TIME')
-                    user = user.reset_index(drop=True)
-                    user['pre'] = user['TIME'].shift(1)
-                    user['cha'] = user['TIME'] - user['pre']
-                    gap = user.ix[user['cha'] >= 1800]
-                    for index, row in gap.iterrows():
-                        trip = user.ix[line_num:index - 1]
-                        le = len(trip) - 1
-                        line_num = index
-                        new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
-                                        [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                                        (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0],
-                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-                        trip_id += 1
-                    trip = user.ix[line_num:]
-                    le = len(trip) - 1
-                    new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
-                                    [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                                    (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0],
-                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-                    curr_id += 1
-                else:
-                    curr_id -= 1
-                    tmp_user = df.ix[df['TERMINALNO'] == curr_id]
-                    flag = False
-    except StopIteration:
-        print('Stop read')
-
-    user_trips = pandas.DataFrame(new_row, columns=['user_id', 'trip_id', 'speeds', 'dir', 'hig', 'coor',
-                                                    'time', 'call', "dis", 't1', 't2', 't3', 't4', 'time_list',
-                                                    'var_dir', 'ave_v', 'var_v', 'ave_h'])
-    user_trips['var_dir'] = user_trips['dir'].map(lambda x: x.var())
-    user_trips.pop('dir')
-    user_trips['var_v'] = user_trips['speeds'].map(lambda x: x.var())
-    user_trips.pop('speeds')
-    user_trips['ave_h'] = user_trips['hig'].map(lambda x: x.mean())
-    user_trips.pop('hig')
-    user_trips['dis'] = user_trips['coor'].map(haversine)
-    user_trips.pop('coor')
-    user_trips['ave_v'] = (user_trips['dis'] / user_trips['time'].map(lambda x: x[1] - x[0]))
-    user_trips['time_list'] = user_trips['time'].map(time_list)
-    user_trips.pop('time')
-    user_trips['t1'] = user_trips['time_list'].map(lambda x: x[0])
-    user_trips['t2'] = user_trips['time_list'].map(lambda x: x[1])
-    user_trips['t3'] = user_trips['time_list'].map(lambda x: x[2])
-    user_trips['t4'] = user_trips['time_list'].map(lambda x: x[3])
-    user_trips.pop('time_list')
-    user_trips.fillna(0, inplace=True)
-
-    Y_data = pandas.DataFrame(y_list, index=id_list)
-    Y_data.index.rename('id', inplace=True)
-    del df
-    gc.collect()
-    print(time.time() - t1)
-    return user_trips, Y_data
-
 def proprocess(file_path):
-#    if path == path_train:
-#        csv_chunk = pandas.read_csv(path, iterator=True,
-#                                    dtype={'TERMINALNO': numpy.int32, 'TIME': numpy.int32,
-#                                           'TRIP_ID': numpy.int32, 'LONGITUDE': numpy.float64,
-#                                           'LATITUDE': numpy.float64,
-#                                           'Y': numpy.float64, 'DIRECTION': numpy.float64,
-#                                           'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
-#                                           'CALLSTATE': numpy.int32},nrows=3000000)
-#        
-#        #,nrows=5000000
-#    else:
-#        csv_chunk = pandas.read_csv(path, iterator=True,
-#                                    dtype={'TERMINALNO': numpy.int32, 'TIME': numpy.int32,
-#                                           'TRIP_ID': numpy.int32, 'LONGITUDE': numpy.float64,
-#                                           'LATITUDE': numpy.float64,
-#                                           'Y': numpy.float64, 'DIRECTION': numpy.float64,
-#                                           'HEIGHT': numpy.float64, 'SPEED': numpy.float64,
-#                                           'CALLSTATE': numpy.int32})
-#        
-#
-#    df = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
-#                                   'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
-#
-#    curr_id = 1
-#    try:
-#        while True:
-#            df2 = csv_chunk.get_chunk(10000000)
-#
-#            df = pandas.concat([df, df2])
-#    except StopIteration:
-#        pass
-#
-#    flag = True
-#    new_row = []
-#    while flag:
-#        trip_id = 0
-#        line_num = 0
-#        user = df.ix[df['TERMINALNO'] == curr_id]
-#        if not user.empty:
-#            user = user.sort_values(by='TIME')
-#            user = user.reset_index(drop=True)
-#            user['pre'] = user['TIME'].shift(1)
-#            user['cha'] = user['TIME'] - user['pre']
-#            gap = user.ix[user['cha'] >= 1800]
-#
-#            for index, row in gap.iterrows():
-#                trip = user.ix[line_num:index - 1]
-#                le = len(trip) - 1
-#                line_num = index
-#                new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
-#                                [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-#                                (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
-#                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-#                trip_id += 1
-#            trip = user.ix[line_num:]
-#            le = len(trip) - 1
-#            new_row.append([curr_id, trip_id, trip.SPEED, trip.DIRECTION, trip.HEIGHT,
-#                            [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-#                            (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 9], trip.iat[0, 0],
-#                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-#            curr_id += 1
-#        else:
-#            break
-#
-#    user_trips = pandas.DataFrame(new_row, columns=['user_id', 'trip_id', 'speeds', 'dir', 'hig', 'coor',
-#                                                    'time', 'Y', 'call', "dis", 't1', 't2', 't3', 't4', 'time_list',
-#                                                    'var_dir', 'ave_v', 'var_v', 'ave_h'])
-#    user_trips['var_dir'] = user_trips['dir'].map(lambda x: x.var()).map(lambda x: x if pandas.notnull(x) else 0)
-#    user_trips['var_v'] = user_trips['speeds'].map(lambda x: x.var()).map(lambda x: x if pandas.notnull(x) else 0)
-#    user_trips['ave_h'] = user_trips['hig'].map(lambda x: x.mean())
-#    user_trips['dis'] = user_trips['coor'].map(haversine)
-#    user_trips['ave_v'] = (user_trips['dis'] / user_trips['time'].map(lambda x: x[1] - x[0])).map(
-#        lambda x: x if pandas.notnull(x) else 0)
-#
-#    user_trips.pop('speeds')
-#    user_trips.pop('dir')
-#    user_trips.pop('hig')
-#    user_trips.pop('coor')
-#    user_trips['time_list'] = user_trips['time'].map(time_list)
-#    user_trips['t1'] = user_trips['time_list'].map(lambda x: x[0])
-#    user_trips['t2'] = user_trips['time_list'].map(lambda x: x[1])
-#    user_trips['t3'] = user_trips['time_list'].map(lambda x: x[2])
-#    user_trips['t4'] = user_trips['time_list'].map(lambda x: x[3])
-#    user_trips.pop('time_list')
-#    user_trips.pop('time')
-#    # user_trips.to_csv('compress.csv')
-#    del df
-#    # del user_trips
-#    gc.collect()
-#    # process(tempdata)
-#    # a = pandas.read_csv('compress.csv')
-#    # print(a[1])
-    
     csv_chunk = pandas.read_csv(file_path, iterator=True,
                                 dtype={'TERMINALNO': numpy.int32, 'TIME': numpy.int32,
                                        'TRIP_ID': numpy.int32, 'LONGITUDE': numpy.float64,
@@ -324,7 +144,7 @@ def proprocess(file_path):
     del new_row
     del y_list
     gc.collect()
-    print(time.time() - t1)
+#    print(time.time() - t1)
 #    return user_trips, Y_data
     
     userIdList = []
@@ -392,36 +212,6 @@ def add_layer(inputs, in_size, out_size, activation_function=None):  # 先不定
         outputs = activation_function(Wx_plus_b)
     return outputs
 
-
-# def process(tempdata):
-#     """
-#     处理过程，在示例中，使用随机方法生成结果，并将结果文件存储到预测结果路径下。
-#     :return:
-#     """
-#     with open(path_test) as lines:
-#         with(open(os.path.join(path_test_out, "test.csv"), mode="w")) as outer:
-#             writer = csv.writer(outer)
-#             i = 0
-#             ret_set = set([])
-#             for line in lines:
-#                 if i == 0:
-#                     i += 1
-#                     writer.writerow(["Id", "Pred"])  # 只有两列，一列Id为用户Id，一列Pred为预测结果(请注意大小写)。
-#                     continue
-#                 item = line.split(",")
-#                 if item[0] in ret_set:
-#                     continue
-#                     #
-#                 test_line = numpy.vstack((item[3], item[4], item[6], item[7], item[8])).T
-#
-#                 pred = clf.predict(test_line)[0]
-#                 pred = 0 if pred < 0.15 else pred
-#                 # if pred != 0 and item[0] in ret_set:
-#                 #     for
-#                 writer.writerow([item[0], pred])  # 随机值
-#                 #
-#                 ret_set.add(item[0])  # 根据赛题要求，ID必须唯一。输出预测值时请注意去重
-
 def writeCsv(test_userIdList, prediction_value):
     with(open(os.path.join(path_test_out, "test.csv"), mode="w")) as outer:
         writer = csv.writer(outer)
@@ -445,23 +235,19 @@ def writeCsv(test_userIdList, prediction_value):
             ret_set.add(test_userIdList[i])  # 根据赛题要求，ID必须唯一。输出预测值时请注意去重
         writer.writerow([test_userIdList[-1], 0])  # 随机值
 
-
-
 if __name__ == "__main__":
     start = time.clock()
     path_train = "/data/dm/train.csv"  # 训练文件
     path_test = "/data/dm/test.csv"  # 测试文件
     path_test_out = "model/"  # 预测结果输出路径为model/xx.csv,有且只能有一个文件并且是CSV格式。
     # PCA提取特征数
-    PCA_featureNum = 10
-
-    train = compress(path_train)
+    PCA_featureNum = 8
 
     print("****************** start **********************")
     train_clusterCenters, train_y, train_userIdList = proprocess(path_train)
-    print('***read train set',time.clock()-start)
+    print('***read train set done',time.clock()-start)
     test_clusterCenters, test_y, test_userIdList = proprocess(path_test)
-    print('***read test set',time.clock()-start)
+    print('***read test set done',time.clock()-start)
     print('***Neural network Begin:',time.clock()-start)
     #簇中心合成一个样例
     train_X = []
@@ -488,11 +274,12 @@ if __name__ == "__main__":
     ys = tf.placeholder(tf.float32, [None, 1])
     # 定义输入层1个，隐藏层10个，输出1个神经元的神经网络
     l1 = add_layer(xs, PCA_featureNum, PCA_featureNum+2, activation_function=tf.nn.relu)
-    predition = add_layer(l1, PCA_featureNum+2, 1, activation_function=None)
+    l2 = add_layer(l1, PCA_featureNum+2, PCA_featureNum + 2, activation_function=tf.nn.relu)
+    predition = add_layer(l2, PCA_featureNum+2, 1, activation_function=None)
     loss = tf.reduce_mean(tf.reduce_sum(tf.square(ys - predition)))
     # train_step = tf.train.GradientDescentOptimizer(0.002).minimize(loss)
 
-    train_step =tf.train.AdamOptimizer(learning_rate=0.05, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
+    train_step =tf.train.AdamOptimizer(learning_rate=0.03, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
                                     name='Adam').minimize(loss)
 
     init = tf.global_variables_initializer()
