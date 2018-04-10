@@ -181,20 +181,28 @@ def proprocess(file_path):
     if file_path == path_train:
         clusterCenters = []
         for i in range(len(lRes)):
-            if len(lRes[i]) >= 3:
-                clusterCenters.append(KMeans(n_clusters=3, random_state=0).fit(lRes[i]).cluster_centers_)
+            if len(lRes[i]) > 5:
+                clusterCenters.append(KMeans(n_clusters=5, random_state=0).fit(lRes[i]).cluster_centers_)
                 yRes.append(y[i])
+            elif len(lRes[i])==5:
+                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][2],lRes[i][3],lRes[i][4]])
+                yRes.append(y[i])
+            
     else:
         clusterCenters = []
         for i in range(len(lRes)):
-            if len(lRes[i]) > 3:
-                clusterCenters.append(KMeans(n_clusters=3, random_state=0).fit(lRes[i]).cluster_centers_)
+            if len(lRes[i]) > 5:
+                clusterCenters.append(KMeans(n_clusters=5, random_state=0).fit(lRes[i]).cluster_centers_)
             elif len(lRes[i])==1:
-                clusterCenters.append([lRes[i][0],lRes[i][0],lRes[i][0]])
+                clusterCenters.append([lRes[i][0],lRes[i][0],lRes[i][0],lRes[i][0],lRes[i][0]])
             elif len(lRes[i])==2:
-                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][1]])
+                clusterCenters.append([lRes[i][0],lRes[i][0],lRes[i][0],lRes[i][1],lRes[i][1]])
             elif len(lRes[i])==3:
-                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][2]])
+                clusterCenters.append([lRes[i][0],lRes[i][0],lRes[i][1],lRes[i][1],lRes[i][2]])
+            elif len(lRes[i])==4:
+                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][2],lRes[i][3],lRes[i][3]])
+            elif len(lRes[i])==5:
+                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][2],lRes[i][3],lRes[i][4]])
             yRes.append(y[i])
 
     return clusterCenters, yRes, userIdList
@@ -237,11 +245,11 @@ def writeCsv(test_userIdList, prediction_value):
 
 if __name__ == "__main__":
     start = time.clock()
-    path_train = "/data/dm/train.csv"  # 训练文件
-    path_test = "/data/dm/test.csv"  # 测试文件
+    path_train = "data/dm/train.csv"  # 训练文件
+    path_test = "data/dm/test.csv"  # 测试文件
     path_test_out = "model/"  # 预测结果输出路径为model/xx.csv,有且只能有一个文件并且是CSV格式。
     # PCA提取特征数
-    PCA_featureNum = 8
+    PCA_featureNum = 10
 
     print("****************** start **********************")
     train_clusterCenters, train_y, train_userIdList = proprocess(path_train)
@@ -257,8 +265,8 @@ if __name__ == "__main__":
     for j in test_clusterCenters:
         test_X.append(numpy.reshape(j, (1, -1)))
 
-    train_X = numpy.reshape(train_X, (-1, 30))
-    test_X = numpy.reshape(test_X, (-1, 30))
+    train_X = numpy.reshape(train_X, (-1, 50))
+    test_X = numpy.reshape(test_X, (-1, 50))
     train_y = numpy.reshape(train_y, (-1, 1))
     #归一化
     min_max_scaler = preprocessing.MinMaxScaler()
