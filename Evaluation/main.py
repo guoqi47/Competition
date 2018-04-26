@@ -84,7 +84,6 @@ def proprocess(file_path):
     curr_id = 0
     user_index = [[], []]
     new_row = []
-    y_list = []
     tmp_user = pandas.DataFrame(columns=['TERMINALNO', 'TIME', 'TRIP_ID', 'LONGITUDE', 'LATITUDE', 'Y',
                                          'DIRECTION', 'HEIGHT', 'SPEED', 'CALLSTATE'], index=[0])
 
@@ -98,7 +97,6 @@ def proprocess(file_path):
                 line_num = 0
                 user = df.ix[df['TERMINALNO'] == curr_id]
                 if not user.empty:
-                    y_list.append([curr_id, user.iat[0, 9]])
                     user = user.sort_values(by='TIME')
                     user = user.reset_index(drop=True)
                     user['pre'] = user['TIME'].shift(1)
@@ -108,19 +106,27 @@ def proprocess(file_path):
                         trip = user.ix[line_num:index - 1]
                         le = len(trip) - 1
                         line_num = index
-                        new_row.append([trip.SPEED, trip.DIRECTION, trip.HEIGHT,
+                        pre_dir = trip.DIRECTION.shift(1)
+                        dir_cha = abs(pre_dir - trip.DIRECTION)
+                        dir_cha_ave = dir_cha.mean()
+                        new_row.append([trip.SPEED, trip.DIRECTION, trip.HEIGHT, dir_cha_ave,
                                         [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                                        (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0],
-                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                                        (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0], 0, 0, 0, 0, 0, 0, 0,
+                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                        user.iat[0, 9]])
                         user_index[0].append(curr_id)
                         user_index[1].append(trip_id)
                         trip_id += 1
                     trip = user.ix[line_num:]
                     le = len(trip) - 1
-                    new_row.append([trip.SPEED, trip.DIRECTION, trip.HEIGHT,
+                    pre_dir = trip.DIRECTION.shift(1)
+                    dir_cha = abs(pre_dir - trip.DIRECTION)
+                    dir_cha_ave = dir_cha.mean()
+                    new_row.append([trip.SPEED, trip.DIRECTION, trip.HEIGHT, dir_cha_ave,
                                     [trip.iat[0, 4], trip.iat[0, 3], trip.iat[le, 4], trip.iat[le, 3]],
-                                    (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0],
-                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                                    (trip.iat[0, 7], trip.iat[-1, 7]), trip.iat[0, 0], 0, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                    user.iat[0, 9]])
                     user_index[0].append(curr_id)
                     user_index[1].append(trip_id)
                     curr_id += 1
@@ -132,16 +138,19 @@ def proprocess(file_path):
         print('Stop read')
     tuples = list(zip(*user_index))
     index = pandas.MultiIndex.from_tuples(tuples, names=['user_id', 'trip_id'])
-    user_trips = pandas.DataFrame(new_row, columns=['speeds', 'dir', 'hig', 'coor',
+    user_trips = pandas.DataFrame(new_row, columns=['speeds', 'dir', 'hig', 'dir_cha_ave', 'coor',
                                                     'time', 'call', "dis", 't1', 't2', 't3', 't4', 'time_list',
                                                     'var_dir', 'ave_v', 'var_v', 'ave_h', 'std_v', 'std_dir', 'std_h',
                                                     'skew_h', 'skew_v', 'kurt_h', 'kurt_v', 'coe_var_h', 'coe_var_v',
-                                                    'mean_v', 'var_h', 'bo_h', 'bo_v'
+                                                    'mean_v', 'var_h', 'bo_h', 'bo_v', 'geo_mean_v', 'geo_mean_h',
+                                                    'dis_sum', 'night', 'user_ave_v', 'user_ave_h', 'dis_ave',
+                                                    'user_main_dir_ave', 'Y'
                                                     ],
                                   index=index)
     user_trips['var_dir'] = user_trips['dir'].map(lambda x: x.var())
     user_trips['std_dir'] = user_trips['dir'].map(lambda x: x.std())
     user_trips.pop('dir')
+
     # 以下速度均由官方SPEED一栏计算
     user_trips['var_v'] = user_trips['speeds'].map(lambda x: x.var())
     user_trips['mean_v'] = user_trips['speeds'].map(lambda x: x.mean())
@@ -150,6 +159,7 @@ def proprocess(file_path):
     user_trips['skew_v'] = user_trips['speeds'].map(lambda x: x.skew())
     user_trips['bo_v'] = user_trips['speeds'].map(bo)
     user_trips['coe_var_v'] = (user_trips['std_v'] / user_trips['mean_v'])
+    user_trips['geo_mean_v'] = (user_trips['std_v'] / user_trips['mean_v'])
     user_trips.pop('speeds')
 
     user_trips['ave_h'] = user_trips['hig'].map(lambda x: x.mean())
@@ -159,11 +169,12 @@ def proprocess(file_path):
     user_trips['kurt_h'] = user_trips['hig'].map(lambda x: x.kurt())
     user_trips['coe_var_h'] = (user_trips['std_h'] / user_trips['ave_h'])
     user_trips['bo_h'] = user_trips['hig'].map(bo)
+    user_trips['geo_mean_h'] = user_trips['hig'].map(bo)
     user_trips.pop('hig')
     user_trips['dis'] = user_trips['coor'].map(haversine)
     user_trips.pop('coor')
     # 该平均速度为起点和终点直线距离与时间的比值
-    user_trips['ave_v'] = user_trips['dis'] / user_trips['time'].map(lambda x: (x[1] - x[0]) / (60.0 * 60))
+    user_trips['ave_v'] = user_trips['dis'] / user_trips['time'].map(lambda x: (x[1] - x[0])/(60.0 * 60))
     user_trips['time_list'] = user_trips['time'].map(time_list)
     user_trips.pop('time')
     user_trips['t1'] = user_trips['time_list'].map(lambda x: x[0])
@@ -172,26 +183,43 @@ def proprocess(file_path):
     user_trips['t4'] = user_trips['time_list'].map(lambda x: x[3])
     user_trips.pop('time_list')
     user_trips.fillna(0, inplace=True)
+    user_trips = user_trips.sort_index()
 
-    Y_data = pandas.DataFrame(y_list, columns=['id', 'Y'])
-    Y_data.drop_duplicates(subset='id', inplace=True)
-    Y_data.set_index('id', inplace=True)
+    # 为每段行程添加用户信息
+    curr_id = 0
+    while True:
+        try:
+            user = user_trips.xs(curr_id)
+            user_dis = user['dis'].sum()
+            user_dis_ave = user['dis'].mean()
+            user_dir_ave = user['dir_cha_ave'].mean()
+            user_night = (user['t1'] + user['t2']).sum()
+            user_ave_v = user['mean_v'].mean()
+            user_ave_h = user['ave_h'].mean()
+            user_trips.loc[curr_id, 'dis_sum'] = user_dis
+            user_trips.loc[curr_id, 'dis_ave'] = user_dis_ave
+            user_trips.loc[curr_id, 'user_ave_h'] = user_ave_h
+            user_trips.loc[curr_id, 'user_ave_v'] = user_ave_v
+            user_trips.loc[curr_id, 'user_main_dir_ave'] = user_dir_ave
+            user_trips.loc[curr_id, 'night'] = (user_night + 0.1 - 0.1) / len(user)
+        except KeyError:
+            if curr_id > 10:
+                break
+        curr_id += 1
+    user_trips.pop('dir_cha_ave')
+
     del df
     del new_row
-    del y_list
     gc.collect()
     print(time.time() - t1)
-    #    return user_trips, Y_data
+#    return user_trips
     user_trips.fillna(0) #空值填充0
 
 
     userIdList = []
     y = []
     userId = 0
-    Y_index = 0
-#    y.append(Y_data['Y'][Y_index])
-#    Y_index += 1
-#    userIdList.append(userId)
+
     l = []
     lRes = []  # 最后按user_id分的列表
     yRes = []  # 最后按user_id分的列表
@@ -200,26 +228,46 @@ def proprocess(file_path):
 #    for i in range(len(Y_data)):
 #       a.append(user_trips.query('index[0]=='+str(i)))
     count=0
-    for index, row in user_trips.iterrows():
-        if index[0] == userId:
-            row = numpy.where((row.isnull() ) | (row>10000000),0,row)
-            l.append(row)
-
-            if count == len(user_trips) - 1:
+    if file_path == path_train:
+        for index, row in user_trips.iterrows():
+            if index[0] == userId:
+                row = numpy.where((row.isnull() ) | (row>10000000),0,row)
+                l.append(row[:31])
+    
+                if count == len(user_trips) - 1:
+                    lRes.append(l)
+                    userIdList.append(index[0])
+                    y.append(row[31])
+            else:
                 lRes.append(l)
-                userIdList.append(index[0])
-                y.append(Y_data['Y'][Y_index])
-        else:
-            lRes.append(l)
-            userIdList.append(userId)
-            y.append(Y_data['Y'][Y_index])
-            Y_index += 1
-
-            l = []
-            row = numpy.where((row.isnull() ) | (row>10000000),0,row)
-            l.append(row)
-            userId = index[0]
-        count+=1
+                userIdList.append(userId)
+                y.append(row['Y'])
+                
+                l = []
+                row = numpy.where((row.isnull() ) | (row>10000000),0,row)
+                l.append(row[:31])
+                userId = index[0]
+            count+=1
+    else:
+        for index, row in user_trips.iterrows():
+            if index[0] == userId:
+                row = numpy.where((row.isnull() ) | (row>10000000),0,row)
+                l.append(row[:31])
+    
+                if count == len(user_trips) - 1:
+                    lRes.append(l)
+                    userIdList.append(index[0])
+            else:
+                lRes.append(l)
+                userIdList.append(userId)
+                
+                l = []
+                row = numpy.where((row.isnull() ) | (row>10000000),0,row)
+                l.append(row[:31])
+                userId = index[0]
+            count+=1
+        
+    
 
     # 进行聚类处理
     if file_path == path_train:
@@ -239,7 +287,7 @@ def proprocess(file_path):
                 clusterCenters.append([lRes[i][0], lRes[i][1], lRes[i][1]])
             elif len(lRes[i]) == 3:
                 clusterCenters.append([lRes[i][0], lRes[i][1], lRes[i][2]])
-            yRes.append(y[i])
+        yRes=[]
 
     return clusterCenters, yRes, userIdList
 
@@ -330,8 +378,8 @@ if __name__ == "__main__":
     for j in test_clusterCenters:
         test_X.append(numpy.reshape(j, (1, -1)))
 
-    train_X = numpy.reshape(train_X, (-1, 69))
-    test_X = numpy.reshape(test_X, (-1, 69))
+    train_X = numpy.reshape(train_X, (-1, 93))
+    test_X = numpy.reshape(test_X, (-1, 93))
     train_y = numpy.reshape(train_y, (-1, 1))
     # 归一化
     min_max_scaler = preprocessing.MinMaxScaler()
