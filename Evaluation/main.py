@@ -233,12 +233,12 @@ def proprocess(file_path):
         for i in range(len(lRes)):
             if len(lRes[i]) > 3:
                 clusterCenters.append(KMeans(n_clusters=3, random_state=0).fit(lRes[i]).cluster_centers_)
-            elif len(lRes[i])==1:
-                clusterCenters.append([lRes[i][0],lRes[i][0],lRes[i][0]])
-            elif len(lRes[i])==2:
-                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][1]])
-            elif len(lRes[i])==3:
-                clusterCenters.append([lRes[i][0],lRes[i][1],lRes[i][2]])
+            elif len(lRes[i]) == 1:
+                clusterCenters.append([lRes[i][0], lRes[i][0], lRes[i][0]])
+            elif len(lRes[i]) == 2:
+                clusterCenters.append([lRes[i][0], lRes[i][1], lRes[i][1]])
+            elif len(lRes[i]) == 3:
+                clusterCenters.append([lRes[i][0], lRes[i][1], lRes[i][2]])
             yRes.append(y[i])
 
     return clusterCenters, yRes, userIdList
@@ -330,8 +330,8 @@ if __name__ == "__main__":
     for j in test_clusterCenters:
         test_X.append(numpy.reshape(j, (1, -1)))
 
-    train_X = numpy.reshape(train_X, (-1, 23*3))
-    test_X = numpy.reshape(test_X, (-1, 23*3))
+    train_X = numpy.reshape(train_X, (-1, 69))
+    test_X = numpy.reshape(test_X, (-1, 69))
     train_y = numpy.reshape(train_y, (-1, 1))
     # 归一化
     min_max_scaler = preprocessing.MinMaxScaler()
@@ -363,14 +363,14 @@ if __name__ == "__main__":
 
 #     XGBoost训练过程
     #基于Scikit-learn接口
-    model = xgb.XGBRegressor(max_depth=6,
+    model = xgb.XGBRegressor(max_depth=3,
                              learning_rate=0.1,
-                             n_estimators=1000,
+                             n_estimators=200,
                              silent=True,
                              objective='reg:linear',
                              booster='gbtree',
                              
-                             gamma=0.3,
+                             gamma=0,
                              min_child_weight=3,
                              max_delta_step=0,
                              subsample=0.8,
