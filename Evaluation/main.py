@@ -358,8 +358,8 @@ def writeCsv(test_userIdList, prediction_value):
 
 if __name__ == "__main__":
     start = time.clock()
-    path_train = "data/dm/train.csv"  # 训练文件
-    path_test = "data/dm/test.csv"  # 测试文件
+    path_train = "/data/dm/train.csv"  # 训练文件
+    path_test = "/data/dm/test.csv"  # 测试文件
     path_test_out = "model/"  # 预测结果输出路径为model/xx.csv,有且只能有一个文件并且是CSV格式。
     # PCA提取特征数
     PCA_featureNum = 30
@@ -411,18 +411,18 @@ if __name__ == "__main__":
 
 #     XGBoost训练过程
     #基于Scikit-learn接口
-    model = xgb.XGBRegressor(max_depth=3,
+    model = xgb.XGBRegressor(max_depth=5,
                              learning_rate=0.1,
-                             n_estimators=200,
+                             n_estimators=500,
                              silent=True,
                              objective='reg:linear',
                              booster='gbtree',
                              
                              gamma=0,
-                             min_child_weight=3,
+                             min_child_weight=3, #越大越防止过拟合
                              max_delta_step=0,
-                             subsample=0.8,
-                             colsample_bytree=0.8,
+                             subsample=0.7,
+                             colsample_bytree=0.9,
                              reg_alpha=1,
                              reg_lambda=1,
                              scale_pos_weight=1,
